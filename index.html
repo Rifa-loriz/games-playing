@@ -64,6 +64,11 @@
             
             --font-head: 'Fredoka', sans-serif;
             --font-body: 'Nunito', sans-serif;
+            /* Safe-area and TV overscan adjustments */
+            --safe-bottom: env(safe-area-inset-bottom, 20px);
+            --safe-left: env(safe-area-inset-left, 20px);
+            --safe-right: env(safe-area-inset-right, 20px);
+            --tv-overscan: 30px; /* extra padding for TVs (can be tuned 20-40px) */
         }
 
         * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
@@ -143,6 +148,8 @@
                 radial-gradient(at 100% 100%, rgba(244, 63, 94, 0.15) 0px, transparent 50%);
             color: var(--text-main);
             margin: 0;
+            /* Use dynamic viewport height on modern browsers with fallback */
+            height: 100dvh;
             height: 100vh;
             width: 100vw;
             overflow: hidden;
@@ -722,25 +729,53 @@
 
         /* Mobile Controls Overlay */
         .mobile-controls {
-            position: absolute; bottom: 20px; left: 0; width: 100%;
-            display: flex; justify-content: space-between; padding: 0 20px;
-            z-index: 50; pointer-events: none;
+            position: absolute;
+            left: 0;
+            width: 100%;
+            /* Place above bottom with consideration for safe-area and TV overscan */
+            bottom: calc(20px + var(--safe-bottom) + var(--tv-overscan));
+            display: flex; justify-content: space-between;
+            padding-left: calc(20px + var(--safe-left));
+            padding-right: calc(20px + var(--safe-right));
+            z-index: 5000; /* high so joystick stays on top */
+            pointer-events: none; /* container non-interactive; inner controls enable pointer-events */
+            touch-action: none; /* improve touch handling on TVs and touch displays */
         }
         .dpad-area {
-            width: 120px; height: 120px;
-            background: rgba(255,255,255,0.1);
-            border: 2px solid rgba(255,255,255,0.1);
+            /* Scale with viewport (vmin) and clamp to sensible min/max for 4K TVs */
+            width: clamp(80px, 12vmin, 220px);
+            height: clamp(80px, 12vmin, 220px);
+            background: rgba(255,255,255,0.08);
+            border: 2px solid rgba(255,255,255,0.08);
             border-radius: 50%;
             position: relative; pointer-events: auto;
             backdrop-filter: blur(2px);
+            display: flex; align-items: center; justify-content: center;
+            box-sizing: border-box;
         }
         .dpad-stick {
-            width: 40px; height: 40px;
-            background: rgba(255,255,255,0.3);
+            width: clamp(32px, 5vmin, 80px);
+            height: clamp(32px, 5vmin, 80px);
+            background: rgba(255,255,255,0.28);
             border-radius: 50%;
             position: absolute; top: 50%; left: 50%;
             transform: translate(-50%, -50%);
-            box-shadow: 0 0 10px rgba(0,0,0,0.2);
+            box-shadow: 0 0 14px rgba(0,0,0,0.2);
+            pointer-events: none; /* visual only; pad handles pointer events */
+        }
+
+        /* For touch devices on large landscape displays (TVs) lift the controls up a bit */
+        @media (orientation: landscape) and (min-width: 900px) and (pointer: coarse) {
+            .mobile-controls {
+                bottom: calc(40px + var(--safe-bottom) + var(--tv-overscan));
+            }
+            .dpad-area { transform: translateY(-6vh); }
+        }
+
+        /* Fallback for devices that report fine pointer but are still large screens (some TVs) */
+        @media (orientation: landscape) and (min-width: 1200px) {
+            .mobile-controls { bottom: calc(48px + var(--safe-bottom) + var(--tv-overscan)); }
+            .dpad-area { transform: translateY(-5vh); }
         }
         .dpad-label {
             display: none; /* MODIFIED: Hide text */
@@ -1359,9 +1394,24 @@
             </div>
         </div>
 
-        <div id="kiss-scare-overlay" class="hidden">
-            <div class="kiss-emoji">😘</div>
-        </div>
+<div id="kiss-scare-overlay" class="hidden">
+    <div class="kiss-emoji">
+        <svg viewBox="0 0 64 64" width="1em" height="1em" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <circle cx="32" cy="32" r="30" fill="#FACC15" />
+            
+            <path d="M17 28C17 28 20 24 24 24C28 24 31 28 31 28" stroke="#451a03" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            
+            <ellipse cx="45" cy="27" rx="3" ry="5" fill="#451a03" />
+            
+            <path d="M36 42C36 42 34 44 32 44C30 44 28 42 28 42" stroke="#451a03" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M37 42H27" stroke="#451a03" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+            
+            <path d="M48 44.5C48 42.5 46 41 44.5 41C43 41 42 42 42 42C42 42 41 41 39.5 41C38 41 36 42.5 36 44.5C36 47.5 42 52 42 52C42 52 48 47.5 48 44.5Z" fill="#EF4444" stroke="#B91C1C" stroke-width="1.5" stroke-linejoin="round"/>
+            
+            <circle cx="15" cy="36" r="3" fill="#FCA5A5" fill-opacity="0.6" />
+        </svg>
+    </div>
+</div>
 
     <!-- 2. MAIN MENU SCREEN -->
 
@@ -1400,9 +1450,16 @@
             </svg>
         </button>
 
-        <button class="toggle-btn" onclick="openHOF()" title="Hall of Fame" style="flex: 0 0 auto; width: 60px; justify-content: center; background: rgba(234, 179, 8, 0.2); border-color: #eab308;">
-            <span style="font-size: 1.5rem;">🏆</span>
-        </button>
+<button class="toggle-btn" onclick="openHOF()" title="Hall of Fame" style="flex: 0 0 auto; width: 60px; justify-content: center; background: rgba(234, 179, 8, 0.2); border-color: #eab308;">
+    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="#facc15" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+        <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+        <path d="M4 22h16" />
+        <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+        <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+        <path d="M18 2H6v7a6 6 0 0 0 12 0V2Z" />
+    </svg>
+</button>
 
         <button id="btn-fullscreen" class="toggle-btn" onclick="toggleFullscreen()" title="Mode Layar Penuh" style="flex: 0 0 auto; width: 60px; justify-content: center; background: rgba(148,163,184,0.08); border-color: #94a3b8;">
             <span style="font-size: 1.2rem;">⤢</span>
@@ -2152,9 +2209,9 @@ async function startRandomDraft() {
                         options[lastIdx].classList.remove('dimmed');
                         options[lastIdx].classList.add('flash-bright');
                         
-                        // Extract ID from onclick attribute or id string 'opt-X'
-                        const idStr = options[lastIdx].id.replace('opt-', '');
-                        resolve(parseInt(idStr));
+                                // Extract ID from onclick attribute or id string 'opt-X'
+                                const idStr = options[lastIdx].id.replace('opt-', '');
+                                resolve(parseInt(idStr));
                     }
                 }
                 spin();
@@ -2425,13 +2482,23 @@ async function startRandomDraft() {
                 const nextId = tourneyQueue[tourneyIndex];
                 const nextName = GAME_DB[nextId].name;
                 
-                // Clone SVG icon from menu
-                const iconSvg = document.querySelector(`#opt-${nextId} .game-icon`).cloneNode(true);
-                iconSvg.classList.add('next-game-icon');
-                
-                document.getElementById('next-game-icon-container').innerHTML = '';
-                document.getElementById('next-game-icon-container').appendChild(iconSvg);
-                document.getElementById('next-game-name').textContent = nextName;
+                // Clone SVG icon from menu and set next-game text properly
+                const iconSvg = document.querySelector(`#opt-${nextId} .game-icon`);
+                const iconContainer = document.getElementById('next-game-icon-container');
+                iconContainer.innerHTML = '';
+                if (iconSvg) {
+                    const clone = iconSvg.cloneNode(true);
+                    clone.classList.add('next-game-icon');
+                    iconContainer.appendChild(clone);
+                }
+
+                // Ensure the visible text element is `next-game-text` and update it
+                const nextTextEl = document.getElementById('next-game-text');
+                if (nextTextEl) {
+                    nextTextEl.textContent = nextName;
+                    nextTextEl.style.color = '#facc15';
+                    nextTextEl.style.fontFamily = 'var(--font-head)';
+                }
 
             } else {
                 // Standard mode
@@ -2857,7 +2924,10 @@ function executeFinalGameOver(loserId) {
                         }
                     } else { triggerLose(p); }
                 };
-                b.addEventListener('mousedown', clickFn); b.addEventListener('touchstart', clickFn);
+                // Use pointerdown to enable simultaneous multi-touch inputs
+                b.addEventListener('pointerdown', function(e){ e.preventDefault(); clickFn(e); });
+                // prevent duplicate click events after pointerdown
+                b.addEventListener('click', function(ev){ ev.stopImmediatePropagation(); ev.preventDefault(); }, true);
                 area.appendChild(b);
             }
         }
@@ -3757,20 +3827,49 @@ function executeFinalGameOver(loserId) {
                 // Mines
                 store.g9.mines.forEach((m, i) => {
                     m.x -= store.g9.speed;
-                    m.angle += 0.05;
-                    ctx.save(); ctx.translate(m.x, m.y); ctx.rotate(m.angle);
-                    ctx.fillStyle = "#ef4444";
-                    // Spikes
-                    for(let k=0; k<8; k++) {
-                        ctx.rotate(Math.PI/4);
-                        ctx.beginPath(); ctx.moveTo(0, -15); ctx.lineTo(4, -22); ctx.lineTo(-4, -22); ctx.fill();
-                    }
-                    // Core
-                    ctx.beginPath(); ctx.arc(0, 0, 15, 0, Math.PI*2); ctx.fill();
-                    // Glow
-                    ctx.fillStyle = "rgba(255, 100, 100, 0.5)"; ctx.beginPath(); ctx.arc(5, -5, 5, 0, Math.PI*2); ctx.fill();
-                    ctx.restore();
+                    m.angle += 0.02; // Rotasi pelan saja agar terlihat berat
+                    ctx.save(); 
+                    ctx.translate(m.x, m.y); 
+                    ctx.rotate(m.angle);
+                    
+                    // 1. Warna Body: Hitam Kebiruan (Dark Metal) biar kesan besi berat
+                    ctx.fillStyle = "#334155"; 
 
+                    // 2. Sumbu Pemicu (Contact Horns)
+                    // Kita buat tumpul (kotak/bulat) dan jumlahnya dikurangi jadi 6 biar gak kayak virus
+                    for(let k=0; k<6; k++) {
+                        ctx.rotate(Math.PI/3); // 60 derajat
+                        ctx.beginPath(); 
+                        // Gambar batang pemicu (bukan segitiga tajam)
+                        ctx.rect(-3, -21, 6, 8); 
+                        ctx.fill();
+                        // Tambah ujung bulat di pemicu
+                        ctx.beginPath(); ctx.arc(0, -21, 3, 0, Math.PI*2); ctx.fill();
+                    }
+
+                    // 3. Body Utama
+                    ctx.beginPath(); ctx.arc(0, 0, 16, 0, Math.PI*2); ctx.fill();
+
+                    // 4. Detail Garis Las/Baut (Garis Tengah)
+                    ctx.strokeStyle = "#1e293b";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath(); ctx.arc(0, 0, 12, 0, Math.PI*2); ctx.stroke();
+
+                    // 5. Lampu Merah Kedip-kedip (Tanda Bahaya)
+                    // Berkedip setiap beberapa frame
+                    if (Math.floor(store.g9.frame / 30) % 2 === 0) {
+                        ctx.fillStyle = "#ef4444";
+                        ctx.shadowBlur = 10; 
+                        ctx.shadowColor = "#ef4444"; // Efek cahaya pendar
+                        ctx.beginPath(); ctx.arc(5, 5, 3, 0, Math.PI*2); ctx.fill();
+                        ctx.shadowBlur = 0; // Reset shadow biar elemen lain gak kena
+                    }
+
+                    // 6. Efek Kilau Besi (Specular Highlight) di pojok kiri atas
+                    ctx.fillStyle = "rgba(255, 255, 255, 0.1)"; 
+                    ctx.beginPath(); ctx.arc(-5, -6, 5, 0, Math.PI*2); ctx.fill();
+
+                    ctx.restore();
                         // Collision Check
                         store.g9.subs.forEach((sub, sIdx) => {
                             const dist = Math.hypot(sub.x - m.x, sub.y - m.y);
@@ -4082,8 +4181,9 @@ function executeFinalGameOver(loserId) {
                     }
                 };
 
-                b.addEventListener('mousedown', hitFn);
-                b.addEventListener('touchstart', hitFn);
+                // Use pointerdown for multi-touch support on balloons
+                b.addEventListener('pointerdown', function(e){ e.preventDefault(); hitFn(e); });
+                b.addEventListener('click', function(ev){ ev.stopImmediatePropagation(); ev.preventDefault(); }, true);
                 sky.appendChild(b);
             });
         }
